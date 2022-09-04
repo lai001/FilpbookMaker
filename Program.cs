@@ -19,8 +19,11 @@ namespace FilpbookMaker
             [Option('o', "output", Required = false, HelpText = "", Default = "output.png")]
             public string outputPath { get; set; }
 
-            [Option('s', "slice", Required = false, HelpText = "", Default = 6)]
-            public int slice { get; set; }
+            [Option('c', "column", Required = false, HelpText = "", Default = 5)]
+            public int column { get; set; }
+
+            [Option('r', "row", Required = false, HelpText = "", Default = 5)]
+            public int row { get; set; }
 
             [Option('f', "offset", Required = false, HelpText = "", Default = 0)]
             public int offset { get; set; }
@@ -30,12 +33,12 @@ namespace FilpbookMaker
         {
             Parser.Default.ParseArguments<Options>(args).WithParsed<Options>(o =>
             {
-                Trace.Assert(o.slice > 0);
+                Trace.Assert(o.column > 0);
+                Trace.Assert(o.row > 0);
                 Trace.Assert(o.inputFolderPath.Count() > 0);
                 Trace.Assert(o.outputPath.Count() > 0);
 
-                int slice = o.slice;
-                int nums = slice * slice;
+                int nums = o.column * o.row;
                 string folderPath = o.inputFolderPath;
                 IEnumerable<string> files = Directory.EnumerateFiles(folderPath);
                 List<string> allFiles = new List<string>();
@@ -50,8 +53,13 @@ namespace FilpbookMaker
                         {
                             Console.WriteLine(file);
                             allFiles.Add(file);
-                            images.Add(Image.FromFile(file));
-                            Trace.Assert(images.Last().Size.Width == images.Last().Size.Height);
+                            Image image = Image.FromFile(file);
+                            if (images.Count > 0)
+                            {
+                                Trace.Assert(images.Last().Size.Width == image.Size.Width);
+                                Trace.Assert(images.Last().Size.Height == image.Size.Height);
+                            }
+                            images.Add(image);
                             Trace.Assert(images.Last().PixelFormat == PixelFormat.Format32bppArgb);
                         }
                         if (images.Count >= nums)
@@ -61,16 +69,21 @@ namespace FilpbookMaker
                     }
                 }
                 Trace.Assert(images.Count == nums);
-                int length = images[0].Size.Width * slice;
-                Bitmap canvas = new Bitmap(length, length, PixelFormat.Format32bppArgb);
+                Bitmap canvas = new Bitmap(images[0].Size.Width * o.column, images[0].Size.Height * o.row, PixelFormat.Format32bppArgb);
                 Graphics graphics = Graphics.FromImage(canvas);
-                for (int i = 0; i < images.Count; i++)
+
+                for (int r = 0; r < o.row; r++)
                 {
-                    Image image = images[0];
-                    int x = (i % slice) * image.Size.Width;
-                    int y = (i / slice) * image.Size.Width;
-                    graphics.DrawImage(images[i], x, y, image.Size.Width, image.Size.Width);
+                    for (int c = 0; c < o.column; c++)
+                    {
+                        Image image = images[0];
+                        int i = o.column * r + c;
+                        int x = c * image.Size.Width;
+                        int y = r * image.Size.Height;
+                        graphics.DrawImage(images[i], x, y, image.Size.Width, image.Size.Width);
+                    }
                 }
+
                 canvas.Save(o.outputPath);
                 Process.Start(new FileInfo(o.outputPath).DirectoryName);
             });
